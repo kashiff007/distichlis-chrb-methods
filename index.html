@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Reproducible methods for k-mer-based detection and dosage estimation of B chromosomes in Distichlis.">
+    <title>Distichlis ChrB Methods</title>
+    <link rel="stylesheet" href="assets/styles.css">
+  </head>
+  <body>
+    <header class="site-header">
+      <div class="wrap nav">
+        <a class="brand" href="#top">Distichlis <span>ChrB</span></a>
+        <nav aria-label="Main navigation">
+          <a href="#workflow">Workflow</a>
+          <a href="#scripts">Scripts</a>
+          <a href="#requirements">Requirements</a>
+          <a href="#gwas">GWAS</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="top">
+      <section class="intro wrap">
+        <p class="eyebrow">Reproducible analysis companion</p>
+        <h1>k-mer-based detection and quantification of B chromosomes</h1>
+        <p class="lede">A practical workflow for discovering conserved ChrB-specific 21-mers from whole-genome sequencing, screening new libraries, estimating ChrB dosage, and evaluating performance at reduced sequencing input.</p>
+        <div class="callout">
+          <strong>Scope.</strong> This repository documents the computational methods used in Nawaz <em>et al.</em>, <em>K-mer-based population-scale detection and quantification of B chromosomes from ultra-low-coverage whole-genome sequencing</em>. It does not contain WGS reads, genome assemblies, or sample metadata with restricted access.
+        </div>
+      </section>
+
+      <section id="workflow" class="workflow-band">
+        <div class="wrap">
+          <p class="eyebrow">Core workflow</p>
+          <h2>From cytology-anchored k-mers to population-scale ChrB calls</h2>
+          <ol class="flow">
+            <li><span>01</span><strong>Define training panels</strong><p>Use cytologically confirmed ChrB-positive and ChrB-negative genets.</p></li>
+            <li><span>02</span><strong>Count canonical 21-mers</strong><p>Generate per-sample k-mer files from paired-end WGS reads with Jellyfish.</p></li>
+            <li><span>03</span><strong>Discover conserved markers</strong><p>Intersect k-mers shared across ChrB-positive genets.</p></li>
+            <li><span>04</span><strong>Remove standard-genome signal</strong><p>Exclude every candidate present in any ChrB-negative genet.</p></li>
+            <li><span>05</span><strong>Screen WGS libraries</strong><p>Count retained marker k-mers, normalize by total sequenced bases, and infer dosage.</p></li>
+          </ol>
+        </div>
+      </section>
+
+      <section class="wrap section-grid">
+        <article>
+          <p class="eyebrow">Marker discovery</p>
+          <h2>WGS-derived ChrB marker panel</h2>
+          <p>Twenty-six cytologically confirmed ChrB-positive <em>D. spicata</em> and <em>D. stricta</em> genets were used to identify canonical 21-mers shared across the positive training panel. The resulting common set was screened against 75 cytologically confirmed ChrB-negative genets. Any k-mer observed in a negative library was removed, yielding the WGS-derived ChrB marker set.</p>
+          <p>The finalized panel contained 201,278 putative ChrB-specific 21-mers. The workflow is intentionally assembly-independent during marker discovery.</p>
+        </article>
+        <aside class="stats" aria-label="Key marker discovery statistics">
+          <div><strong>26</strong><span>cytology-confirmed ChrB-positive genets</span></div>
+          <div><strong>75</strong><span>cytology-confirmed ChrB-negative genets</span></div>
+          <div><strong>201,278</strong><span>WGS-derived ChrB-specific 21-mers</span></div>
+        </aside>
+      </section>
+
+      <section class="wrap method-card" id="screening">
+        <p class="eyebrow">Library screening and dosage</p>
+        <h2>Normalize marker abundance before estimating copy number</h2>
+        <p>For each WGS library, canonical 21-mers are counted with Jellyfish and the number of distinct detected WGS-marker-set k-mers is recorded. To account for sequencing effort, abundance is expressed per million sequenced bases:</p>
+        <pre><code>normalized ChrB abundance = (ChrB-specific k-mer hits × 1,000,000)
+                            / (paired-end read pairs × 300 bp)</code></pre>
+        <p>For the WGS-marker set, the unrounded predicted ChrB copy number is calculated as normalized abundance divided by 12. This scaling factor was calibrated against independent cytological chromosome counts. ChrB status is then derived from the calibrated abundance/copy-number signal according to the study criteria.</p>
+        <p>The included Jellyfish scanner accepts a three-column sample sheet (<code>sample_id</code>, <code>R1</code>, <code>R2</code>), is suitable for a Slurm array, and writes an independent result file per library to avoid concurrent writes to a shared table.</p>
+      </section>
+
+      <section class="wrap two-column" id="sex">
+        <article>
+          <p class="eyebrow">Independent validation</p>
+          <h2>Reference-derived marker panel</h2>
+          <p>A second panel was generated from the k-mers shared among three independently assembled ChrB sequences. K-mers present in the A chromosomes, chloroplast, or mitochondrial sequences of the three reference genomes were excluded. The reference-derived panel offered an orthogonal sequence-based validation of the WGS-derived markers.</p>
+          <p><a class="text-link" href="scripts/04_build_reference_chrb_marker_set.sh">View <code>04_build_reference_chrb_marker_set.sh</code></a></p>
+        </article>
+        <article>
+          <p class="eyebrow">Sex-marker workflow</p>
+          <h2>Female-enriched SDR 21-mers</h2>
+          <p>The same discovery logic was applied to observed-sex training genets: identify k-mers shared or enriched among females and remove k-mers observed among males. These markers were then used to infer sex from WGS, with performance evaluated against independently observed sex.</p>
+        </article>
+      </section>
+
+      <section id="scripts" class="scripts-band">
+        <div class="wrap">
+          <p class="eyebrow">Available scripts</p>
+          <h2>Shell scripts included in this repository</h2>
+          <div class="script-list">
+            <a href="scripts/01_intersect_chrb_positive_kmers.sh"><strong>01_intersect_chrb_positive_kmers.sh</strong><span>Intersects canonical 21-mers across cytologically confirmed ChrB-positive genets.</span></a>
+            <a href="scripts/02_subtract_chrb_negative_kmers.sh"><strong>02_subtract_chrb_negative_kmers.sh</strong><span>Removes every marker observed in the ChrB-negative panel.</span></a>
+            <a href="scripts/03_screen_wgs_chrb_markers_jellyfish.sh"><strong>03_screen_wgs_chrb_markers_jellyfish.sh</strong><span>Counts canonical 21-mers from paired WGS reads and queries the WGS-marker panel with Jellyfish.</span></a>
+            <a href="scripts/04_build_reference_chrb_marker_set.sh"><strong>04_build_reference_chrb_marker_set.sh</strong><span>Builds the canonical marker set shared by all three ChrB assemblies and removes non-ChrB matches.</span></a>
+            <a href="scripts/05_discover_female_enriched_sdr_kmers.sh"><strong>05_discover_female_enriched_sdr_kmers.sh</strong><span>Computes female and male k-mer prevalence and selects the 95% female / 1% male SDR panel.</span></a>
+            <a href="scripts/06_downsample_paired_end_wgs.sh"><strong>06_downsample_paired_end_wgs.sh</strong><span>Creates all ten paired-end WGS downsampling levels with matched random seeds.</span></a>
+          </div>
+        </div>
+      </section>
+
+      <section class="wrap two-column" id="downsampling">
+        <article>
+          <p class="eyebrow">Sensitivity analysis</p>
+          <h2>In silico downsampling</h2>
+          <p>High-coverage paired-end WGS libraries from 40 cytologically validated genets, including 20 ChrB-positive and 20 ChrB-negative genets, were downsampled independently across a range of input fractions. Each subset was re-screened using the WGS-marker set and the predicted copy number was compared with cytology.</p>
+          <p>In this dataset, detection and dosage remained concordant with cytology to approximately 0.5× coverage; uncertainty increased at lower coverage.</p>
+        </article>
+        <article id="gwas">
+          <p class="eyebrow">Association mapping</p>
+          <h2>GWAS of ChrB presence</h2>
+          <p>The manuscript reports an eastern <em>D. spicata</em> GWAS of ChrB presence/absence using 292 genets, including 94 ChrB-positive and 198 ChrB-negative individuals. The analysis used a binomial logistic mixed model in GMMAT to account for population structure and relatedness.</p>
+          <p>The manuscript's final binary association model was fit in GMMAT; its phenotype preparation, logistic mixed-model, annotation, and enrichment scripts will be added once deposited. A separate GLM/GEMMA sensitivity-analysis script is retained in <code>scripts/archive</code> and is not presented as the final manuscript GWAS workflow.</p>
+        </article>
+      </section>
+
+      <section id="requirements" class="wrap requirements">
+        <p class="eyebrow">Software</p>
+        <h2>Minimum computational requirements</h2>
+        <ul>
+          <li>Jellyfish for canonical 21-mer counting.</li>
+          <li>GNU coreutils for sorting and set intersections.</li>
+          <li>Seqtk and GNU Parallel for read downsampling.</li>
+          <li>A Slurm-compatible scheduler for the example high-memory and multi-core workloads.</li>
+        </ul>
+        <p>Example commands assume 2 × 150-bp paired-end reads and 30 threads. Update input paths, file names, memory allocation, and the marker-panel filename for your environment.</p>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <p>Methods companion for Nawaz <em>et al.</em> | Built for transparent, reusable ChrB screening workflows.</p>
+      </div>
+    </footer>
+  </body>
+</html>
